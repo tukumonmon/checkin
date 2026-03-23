@@ -34,7 +34,7 @@
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script>
     // ▼▼ GASのWebアプリURLに差し替えてください ▼▼
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyuZbAmRqXH-LiuT0Bh5H26mo8jgmxSWidhl9tlFrowEqAEAiQt-PhMsZSemVMAvLrl/exec';
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwWefq_0N5t7BDUwxGVAITGFJhQM3lrTTBit34yw_bpR_-ziKXKnWgmi6YVUaVOCoyt/exec';
     // ▲▲ ここまで ▲▲
 
     var stream = null;
@@ -108,20 +108,28 @@
       document.getElementById('regNum').value = '';
     }
 
-    function checkIn(regNumber) {
+function checkIn(regNumber) {
   document.getElementById('result').className = '';
   document.getElementById('result').textContent = '確認中...';
 
-  const url = GAS_URL + '?action=checkin&reg=' + encodeURIComponent(regNumber);
-  const img = new Image();
-  img.src = url;
+  const callbackName = 'gasCallback_' + Date.now();
+  const url = GAS_URL + '?action=checkin&reg=' + encodeURIComponent(regNumber) + '&callback=' + callbackName;
 
-  setTimeout(function() {
-    document.getElementById('result').className = 'ok';
-    document.getElementById('result').textContent = '✅ チェックイン完了！スプレッドシートを確認してください';
-  }, 2000);
+  window[callbackName] = function(data) {
+    showResult(data);
+    delete window[callbackName];
+    document.getElementById('jsonp').remove();
+  };
+
+  const script = document.createElement('script');
+  script.id = 'jsonp';
+  script.src = url;
+  script.onerror = function() {
+    document.getElementById('result').className = 'error';
+    document.getElementById('result').textContent = 'エラーが発生しました';
+  };
+  document.body.appendChild(script);
 }
-
     function showResult(res) {
       var el = document.getElementById('result');
       if (res.status === 'ok')        { el.className = 'ok';        el.textContent = '✅ 入場OK：' + res.name + ' 様'; }
