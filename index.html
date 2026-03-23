@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>チェックイン</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 400px; margin: 0 auto; }
+    video { width: 100%; border-radius: 8px; display: none; }
+    input { width: 100%; padding: 12px; font-size: 18px; margin: 10px 0; box-sizing: border-box; }
+    button { width: 100%; padding: 14px; font-size: 18px; background: #4285f4; color: white; border: none; border-radius: 6px; margin: 4px 0; cursor: pointer; }
+    #stopBtn { background: #aaa; display: none; }
+    #result { margin-top: 20px; padding: 16px; border-radius: 6px; font-size: 18px; text-align: center; min-height: 50px; }
+    .ok        { background: #d4edda; color: #155724; }
+    .duplicate { background: #fff3cd; color: #856404; }
+    .notfound  { background: #f8d7da; color: #721c24; }
+    .error     { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+  <h2>📋 受付チェックイン</h2>
+
+  <video id="video" autoplay playsinline muted></video>
+
+  <button id="startBtn" onclick="startScan()">📷 カメラでQRコードを読み取る</button>
+  <button id="stopBtn" onclick="stopScan()">⏹ カメラを停止</button>
+
+  <p style="text-align:center; color:#888; margin:16px 0;">または</p>
+  <input type="text" id="regNum" placeholder="整理番号を手入力（例: EVT-0001）" />
+  <button onclick="submitManual()">手入力でチェックイン</button>
+
+  <div id="result"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script>
+    // ▼▼ GASのWebアプリURLに差し替えてください ▼▼
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzxswJpsQtqgZ5GZAaDFQfA-X0AghvC0ZiVYfm4SEigFX9_UbZWZWTgnVIn8P8wfVcO/exec';
+    // ▲▲ ここまで ▲▲
+
+    var stream = null;
+    var scanning = false;
+    var animFrame = null;
+
+    function startScan() {
+      document.getElementById('result').className = '';
+      document.getElementById('result').textContent = 'カメラを起動中...';
+      navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } }
+      })
+      .then(function(s) {
+        stream = s;
+        var video = document.getElementById('video');
+        video.srcObject = stream;
+        video.style.display = 'block';
+        document.getElementById('stopBtn').style.display = 'block';
+        document.getElementById('startBtn').style.display = 'none';
+        document.getElementById('result').textContent = 'QRコードをカメラに向けてください';
+        scanning = true;
+        video.onloadedmetadata = function() {
+          video.play();
+          scanLoop();
+        };
+      })
+      .catch(function(err) {
+        document.getElementById('result').className = 'error';
+        document.getElementById('result').textContent = 'カメラのアクセスを許可してください：' + err.message;
+      });
+    }
+
+    function scanLoop() {
+      if (!scanning) return;
+      var video = document.getElementById('video');
+      var canvas = document.createElement('canvas');
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        var code = jsQR(imageData.data, imageData.width, imageData.height);
+        if (code) {
+          scanning = false;
+          stopScan();
+          var regNumber = code.data.split('|')[0];
+          checkIn(regNumber);
+          return;
+        }
+      }
+      animFrame = requestAnimationFrame(scanLoop);
+    }
+
+    function stopScan() {
+      scanning = false;
+      if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+      if (stream) {
+        stream.getTracks().forEach(function(t) { t.stop(); });
+        stream = null;
+      }
+      document.getElementById('video').style.display = 'none';
+      document.getElementById('stopBtn').style.display = 'none';
+      document.getElementById('startBtn').style.display = 'block';
+    }
+
+    function submitManual() {
+      var val = document.getElementById('regNum').value.trim();
+      if (!val) return;
+      checkIn(val);
+      document.getElementById('regNum').value = '';
+    }
+
+    function checkIn(regNumber) {
+      document.getElementById('result').className = '';
+      document.getElementById('result').textContent = '確認中...';
+      fetch(GAS_URL + '?action=checkin&reg=' + encodeURIComponent(regNumber))
+        .then(function(res) { return res.json(); })
+        .then(function(data) { showResult(data); })
+        .catch(function(err) {
+          document.getElementById('result').className = 'error';
+          document.getElementById('result').textContent = 'エラーが発生しました';
+        });
+    }
+
+    function showResult(res) {
+      var el = document.getElementById('result');
+      if (res.status === 'ok')        { el.className = 'ok';        el.textContent = '✅ 入場OK：' + res.name + ' 様'; }
+      if (res.status === 'duplicate') { el.className = 'duplicate'; el.textContent = '⚠️ 入場済み：' + res.name + ' 様'; }
+      if (res.status === 'notfound')  { el.className = 'notfound';  el.textContent = '❌ 整理番号が見つかりません'; }
+    }
+  </script>
+</body>
+</html>
