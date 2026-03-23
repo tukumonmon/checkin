@@ -109,16 +109,16 @@
     }
 
     function checkIn(regNumber) {
-      document.getElementById('result').className = '';
-      document.getElementById('result').textContent = '確認中...';
-      fetch(GAS_URL + '?action=checkin&reg=' + encodeURIComponent(regNumber))
-        .then(function(res) { return res.json(); })
-        .then(function(data) { showResult(data); })
-        .catch(function(err) {
-          document.getElementById('result').className = 'error';
-          document.getElementById('result').textContent = 'エラーが発生しました';
-        });
-    }
+  document.getElementById('result').className = '';
+  document.getElementById('result').textContent = '確認中... 整理番号:' + regNumber;
+  fetch(GAS_URL + '?action=checkin&reg=' + encodeURIComponent(regNumber))
+    .then(function(res) { return res.json(); })
+    .then(function(data) { showResult(data); })
+    .catch(function(err) {
+      document.getElementById('result').className = 'error';
+      document.getElementById('result').textContent = 'エラー詳細：' + err.toString();
+    });
+}
 
     function showResult(res) {
       var el = document.getElementById('result');
