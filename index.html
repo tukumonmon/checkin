@@ -110,14 +110,24 @@
 
     function checkIn(regNumber) {
   document.getElementById('result').className = '';
-  document.getElementById('result').textContent = '確認中... 整理番号:' + regNumber;
-  fetch(GAS_URL + '?action=checkin&reg=' + encodeURIComponent(regNumber))
-    .then(function(res) { return res.json(); })
-    .then(function(data) { showResult(data); })
-    .catch(function(err) {
-      document.getElementById('result').className = 'error';
-      document.getElementById('result').textContent = 'エラー詳細：' + err.toString();
-    });
+  document.getElementById('result').textContent = '確認中...';
+  
+  const url = GAS_URL + '?action=checkin&reg=' + encodeURIComponent(regNumber);
+  
+  fetch(url, {
+    method: 'GET',
+    mode: 'no-cors'
+  })
+  .then(function() {
+    // no-corsではレスポンスが読めないため再度取得
+    return fetch(url + '&callback=1');
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) { showResult(data); })
+  .catch(function(err) {
+    document.getElementById('result').className = 'error';
+    document.getElementById('result').textContent = 'エラー：' + err.toString();
+  });
 }
 
     function showResult(res) {
